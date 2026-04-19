@@ -1,0 +1,28 @@
+---
+description: Before creating or changing Playwright tests or config, read the repo skill then relevant core guides
+globs:
+  - tests/**/*.ts
+  - playwright.config.ts
+alwaysApply: false
+---
+
+# Hook — Playwright skill
+
+When creating or editing files that match the **globs** above, **read first** (Read tool) the skill entry point:
+
+- **`.agents/skills/playwright-skill/SKILL.md`** — Golden Rules + guide index.
+
+Then open **only** guides relevant to the task under **`.agents/skills/playwright-skill/core/`** (or `playwright-cli/` for terminal automation), for example:
+
+| Task | File |
+|------|------|
+| Locators | `core/locator-strategy.md` |
+| Assertions / waiting | `core/assertions-and-waiting.md` |
+| Structure / naming | `core/test-organization.md` |
+| Fixtures / hooks | `core/fixtures-and-hooks.md` |
+| Test data | `core/test-data-management.md` |
+| Login / auth | `core/authentication.md` |
+
+**Short reminders from SKILL:** prefer `getByRole`; use `getByTestId` when `data-test(id)` hooks are an intentional UI contract; **web-first** `expect(locator)`; no `waitForTimeout`; keep `baseURL` in config/fixture and avoid repeating absolute URLs in specs; shared setup via **fixtures** (`test.extend`).
+
+Do not add patterns the skill explicitly avoids (for example asserting on raw `textContent()`) without a strong, brief justification.
