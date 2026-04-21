@@ -110,8 +110,9 @@ jobs:
             --arg result "$RESULT" \
             --arg sheetName "Login" \
             '{secret: $secret, testCaseId: $testCaseId, result: $result, sheetName: $sheetName}')"
-          # Do not use curl -L here: redirects can turn POST into GET or return an HTML error page while jq expects JSON.
-          resp="$(curl -sS -X POST "$SHEETS_WEBHOOK_URL" \
+          # Apps Script /exec often responds with 302 → script.googleusercontent.com; follow it but keep POST + body
+          # (--post302/--post303; plain -L would resend as GET and you get HTML instead of JSON).
+          resp="$(curl -sS -L --post301 --post302 --post303 -X POST "$SHEETS_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$payload")"
           echo "$resp"
