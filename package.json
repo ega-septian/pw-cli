@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test:storedemo": "PLAYWRIGHT_HTML_OPEN=never playwright test --project=saucedemo-chromium"
+    "test:swag-labs": "PLAYWRIGHT_HTML_OPEN=never playwright test --project=swag-labs-chromium"
   },
   "keywords": [],
   "author": "",

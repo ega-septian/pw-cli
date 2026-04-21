@@ -47,7 +47,46 @@ jobs:
         run: npx playwright install-deps
 
       - name: Run Playwright tests
+        id: playwright
         run: npx playwright test
+
+      - name: Report TC-LP-001 to Google Sheet (Pass)
+        if: success()
+        env:
+          SHEETS_WEBHOOK_URL: ${{ secrets.SHEETS_WEBHOOK_URL }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: |
+          if [ -z "${SHEETS_WEBHOOK_URL:-}" ] || [ -z "${WEBHOOK_SECRET:-}" ]; then
+            echo "Skipping Google Sheet: set SHEETS_WEBHOOK_URL and WEBHOOK_SECRET in repo Actions secrets."
+            exit 0
+          fi
+          curl -sS -X POST "$SHEETS_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg secret "$WEBHOOK_SECRET" \
+              --arg testCaseId "TC-LP-001" \
+              --arg result "Pass" \
+              --arg sheetName "Login" \
+              '{secret: $secret, testCaseId: $testCaseId, result: $result, sheetName: $sheetName}')"
+
+      - name: Report TC-LP-001 to Google Sheet (Fail)
+        if: failure() && steps.playwright.outcome == 'failure'
+        env:
+          SHEETS_WEBHOOK_URL: ${{ secrets.SHEETS_WEBHOOK_URL }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: |
+          if [ -z "${SHEETS_WEBHOOK_URL:-}" ] || [ -z "${WEBHOOK_SECRET:-}" ]; then
+            echo "Skipping Google Sheet: set SHEETS_WEBHOOK_URL and WEBHOOK_SECRET in repo Actions secrets."
+            exit 0
+          fi
+          curl -sS -X POST "$SHEETS_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg secret "$WEBHOOK_SECRET" \
+              --arg testCaseId "TC-LP-001" \
+              --arg result "Fail" \
+              --arg sheetName "Login" \
+              '{secret: $secret, testCaseId: $testCaseId, result: $result, sheetName: $sheetName}')"
 
       - name: Upload HTML report
         uses: actions/upload-artifact@v4
