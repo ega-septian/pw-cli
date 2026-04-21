@@ -110,12 +110,17 @@ jobs:
             --arg result "$RESULT" \
             --arg sheetName "Login" \
             '{secret: $secret, testCaseId: $testCaseId, result: $result, sheetName: $sheetName}')"
-          resp="$(curl -sS -L -X POST "$SHEETS_WEBHOOK_URL" \
+          # Do not use curl -L here: redirects can turn POST into GET or return an HTML error page while jq expects JSON.
+          resp="$(curl -sS -X POST "$SHEETS_WEBHOOK_URL" \
             -H "Content-Type: application/json" \
             -d "$payload")"
           echo "$resp"
+          if ! echo "$resp" | jq -e . >/dev/null 2>&1; then
+            echo "::error::Webhook response is not JSON (often wrong SHEETS_WEBHOOK_URL: use the Web App URL ending in /exec from Apps Script → Deploy → Manage deployments, not a Drive or script.google.com editor link)."
+            exit 1
+          fi
           echo "$resp" | jq -e '.ok == true' >/dev/null || {
-            echo "::error::Google Sheet webhook returned failure (e.g. test_case_not_found if TC-LP-001 is missing from tab Login)."
-            echo "$resp" | jq . 2>/dev/null || echo "$resp"
+            echo "::error::Google Sheet webhook returned ok!=true (e.g. test_case_not_found if TC-LP-001 is missing from tab Login)."
+            echo "$resp" | jq .
             exit 1
           }
