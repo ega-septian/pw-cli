@@ -1,14 +1,19 @@
-import { test, expect } from './fixtures/saucedemo-fixtures';
-import { SauceDemoInventoryPage } from './pages/saucedemo-inventory.page';
-import { SauceDemoLoginPage } from './pages/saucedemo-login.page';
+import { test, expect } from '../../fixtures/base.fixture';
+import { InventoryPage } from '../../pages/inventory.page';
+import { LoginPage } from '../../pages/login.page';
 
-test.describe('TC-LP-001 — Verify login with valid credentials', { tag: '@TC-LP-001' }, () => {
-  test('Standard User reaches product catalog after valid login', async ({
+/**
+ * Login area — one file, many scenarios. Put **tags on each `test()`** (e.g. @TC-LP-001)
+ * so you can run `npx playwright test --grep @TC-LP-001`. Optional: add `@suite-login`
+ * on `test.describe` if you also want `--grep @suite-login` for all login TCs at once.
+ */
+test.describe('Login suite', () => {
+  test('Standard User reaches product catalog after valid login', { tag: '@TC-LP-001' }, async ({
     page,
-    sauceDemoUsername,
-    sauceDemoPassword,
+    swagLabsUsername,
+    swagLabsPassword,
   }) => {
-    const loginPage = new SauceDemoLoginPage(page);
+    const loginPage = new LoginPage(page);
 
     await test.step('Step 1: Open the login page', async () => {
       await loginPage.goto();
@@ -18,10 +23,10 @@ test.describe('TC-LP-001 — Verify login with valid credentials', { tag: '@TC-L
     await test.step('Step 2: Enter valid username and password', async () => {
       await expect(loginPage.usernameInput).toBeVisible();
       await expect(loginPage.passwordInput).toBeVisible();
-      await loginPage.fillCredentials(sauceDemoUsername, sauceDemoPassword);
+      await loginPage.fillCredentials(swagLabsUsername, swagLabsPassword);
     });
 
-    const catalog = await test.step('Step 3: Click Login', async (): Promise<SauceDemoInventoryPage> => {
+    const catalog = await test.step('Step 3: Click Login', async (): Promise<InventoryPage> => {
       await expect(loginPage.loginButton).toBeVisible();
       return loginPage.submitLogin();
     });

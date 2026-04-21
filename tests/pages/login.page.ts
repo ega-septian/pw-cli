@@ -1,8 +1,8 @@
 import { type Locator, type Page } from '@playwright/test';
-import { SauceDemoInventoryPage } from './saucedemo-inventory.page';
+import { InventoryPage } from './inventory.page';
 
-/** Sauce Demo login page (/) — actions only; assertions stay in specs. */
-export class SauceDemoLoginPage {
+/** Login page (/) — actions only; assertions stay in specs. */
+export class LoginPage {
   readonly usernameInput: Locator;
   readonly passwordInput: Locator;
   readonly loginButton: Locator;
@@ -22,10 +22,9 @@ export class SauceDemoLoginPage {
     await this.passwordInput.fill(password);
   }
 
-  /** Clicks Login and yields the catalog page object (navigation). */
-  async submitLogin(): Promise<SauceDemoInventoryPage> {
+  async submitLogin(): Promise<InventoryPage> {
     await this.loginButton.click();
     await this.page.waitForURL(/\/inventory\.html$/);
-    return new SauceDemoInventoryPage(this.page);
+    return new InventoryPage(this.page);
   }
 }

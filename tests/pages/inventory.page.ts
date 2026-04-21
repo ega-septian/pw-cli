@@ -1,7 +1,7 @@
 import { type Locator, type Page } from '@playwright/test';
 
-/** Product catalog after successful Sauce Demo login (inventory.html). */
-export class SauceDemoInventoryPage {
+/** Product catalog (inventory.html) after login. */
+export class InventoryPage {
   readonly openMenuButton: Locator;
   readonly swagLabsTitle: Locator;
   readonly productsTitle: Locator;
