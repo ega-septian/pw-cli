@@ -83,52 +83,15 @@ jobs:
     timeout-minutes: 5
 
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: Update TC status in Google Sheet
         env:
+          PLAYWRIGHT_OUTCOME: ${{ needs.test.outputs.playwright-outcome }}
           SHEETS_WEBHOOK_URL: ${{ secrets.SHEETS_WEBHOOK_URL }}
           WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
-        run: |
-          set -euo pipefail
-          pw="${{ needs.test.outputs.playwright-outcome }}"
-          if [ "$pw" != "success" ] && [ "$pw" != "failure" ]; then
-            echo "Skipping sheet update: Playwright step outcome is '$pw' (not success or failure)."
-            exit 0
-          fi
-          if [ -z "${SHEETS_WEBHOOK_URL:-}" ] || [ -z "${WEBHOOK_SECRET:-}" ]; then
-            echo "Skipping Google Sheet: set SHEETS_WEBHOOK_URL and WEBHOOK_SECRET in repo Actions secrets."
-            exit 0
-          fi
-          if [ "$pw" = "success" ]; then
-            RESULT="Pass"
-          else
-            RESULT="Fail"
-          fi
-          echo "Posting TC-LP-001 as $RESULT to sheet Login (Playwright outcome=$pw)."
-          payload="$(jq -n \
-            --arg secret "$WEBHOOK_SECRET" \
-            --arg testCaseId "TC-LP-001" \
-            --arg result "$RESULT" \
-            --arg sheetName "Login" \
-            '{secret: $secret, testCaseId: $testCaseId, result: $result, sheetName: $sheetName}')"
-          # Apps Script: POST .../exec runs doPost, then 302 → script.googleusercontent.com/macros/echo?...
-          # The echo URL must be requested with GET. Do not use -X POST or --post302: those keep POST on
-          # the redirect and you get HTML (e.g. Drive "Page Not Found") while the sheet may still update.
-          # Use -L and let -d imply POST only on the first hop (same idea as Postman's --location).
-          resp="$(curl -sS -L \
-            -H "Content-Type: application/json" \
-            -d "$payload" \
-            "$SHEETS_WEBHOOK_URL")"
-          echo "$resp"
-          if ! echo "$resp" | jq -e . >/dev/null 2>&1; then
-            if echo "$resp" | grep -qiE 'Sorry, unable to open the file|<title>Page Not Found</title>|docs-drivelogo'; then
-              echo "::error::Got Google Drive HTML instead of JSON. If SHEETS_WEBHOOK_URL is the real .../exec URL, the redirect hop was probably wrong (curl must follow 302 with GET to script.googleusercontent.com/echo — do not force POST on redirects)."
-            else
-              echo "::error::Webhook response is not JSON (wrong SHEETS_WEBHOOK_URL, or curl not following Apps Script 302→GET echo hop)."
-            fi
-            exit 1
-          fi
-          echo "$resp" | jq -e '.ok == true' >/dev/null || {
-            echo "::error::Google Sheet webhook returned ok!=true (e.g. test_case_not_found if TC-LP-001 is missing from tab Login)."
-            echo "$resp" | jq .
-            exit 1
-          }
+        run: node scripts/ci-report-google-sheet.mjs
