@@ -1,4 +1,6 @@
 # Playwright CI — aligned with .agents/skills/playwright-skill/ci/ci-github-actions.md (Pattern 1)
+# Sheet reporting is a separate job so you can "Re-run failed jobs" on webhook-only failures
+# without re-running browser install + tests.
 name: Playwright Tests
 
 on:
@@ -19,6 +21,8 @@ jobs:
   test:
     timeout-minutes: 30
     runs-on: ubuntu-latest
+    outputs:
+      playwright-outcome: ${{ steps.playwright-meta.outputs.outcome }}
 
     steps:
       - uses: actions/checkout@v4
@@ -50,43 +54,10 @@ jobs:
         id: playwright
         run: npx playwright test
 
-      - name: Report TC-LP-001 to Google Sheet (Pass)
-        if: success()
-        env:
-          SHEETS_WEBHOOK_URL: ${{ secrets.SHEETS_WEBHOOK_URL }}
-          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
-        run: |
-          if [ -z "${SHEETS_WEBHOOK_URL:-}" ] || [ -z "${WEBHOOK_SECRET:-}" ]; then
-            echo "Skipping Google Sheet: set SHEETS_WEBHOOK_URL and WEBHOOK_SECRET in repo Actions secrets."
-            exit 0
-          fi
-          curl -sS -X POST "$SHEETS_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg secret "$WEBHOOK_SECRET" \
-              --arg testCaseId "TC-LP-001" \
-              --arg result "Pass" \
-              --arg sheetName "Login" \
-              '{secret: $secret, testCaseId: $testCaseId, result: $result, sheetName: $sheetName}')"
-
-      - name: Report TC-LP-001 to Google Sheet (Fail)
-        if: failure() && steps.playwright.outcome == 'failure'
-        env:
-          SHEETS_WEBHOOK_URL: ${{ secrets.SHEETS_WEBHOOK_URL }}
-          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
-        run: |
-          if [ -z "${SHEETS_WEBHOOK_URL:-}" ] || [ -z "${WEBHOOK_SECRET:-}" ]; then
-            echo "Skipping Google Sheet: set SHEETS_WEBHOOK_URL and WEBHOOK_SECRET in repo Actions secrets."
-            exit 0
-          fi
-          curl -sS -X POST "$SHEETS_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg secret "$WEBHOOK_SECRET" \
-              --arg testCaseId "TC-LP-001" \
-              --arg result "Fail" \
-              --arg sheetName "Login" \
-              '{secret: $secret, testCaseId: $testCaseId, result: $result, sheetName: $sheetName}')"
+      - name: Expose Playwright step outcome for later jobs
+        id: playwright-meta
+        if: always()
+        run: echo "outcome=${{ steps.playwright.outcome }}" >> "$GITHUB_OUTPUT"
 
       - name: Upload HTML report
         uses: actions/upload-artifact@v4
@@ -103,3 +74,63 @@ jobs:
           name: playwright-test-results
           path: test-results/
           retention-days: 7
+
+  report-sheet:
+    name: Report TC-LP-001 to Google Sheet
+    needs: test
+    if: always() && needs.test.result != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Report Pass
+        if: needs.test.outputs.playwright-outcome == 'success'
+        env:
+          SHEETS_WEBHOOK_URL: ${{ secrets.SHEETS_WEBHOOK_URL }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: |
+          if [ -z "${SHEETS_WEBHOOK_URL:-}" ] || [ -z "${WEBHOOK_SECRET:-}" ]; then
+            echo "Skipping Google Sheet: set SHEETS_WEBHOOK_URL and WEBHOOK_SECRET in repo Actions secrets."
+            exit 0
+          fi
+          payload="$(jq -n \
+            --arg secret "$WEBHOOK_SECRET" \
+            --arg testCaseId "TC-LZ-001" \
+            --arg result "Pass" \
+            --arg sheetName "Login" \
+            '{secret: $secret, testCaseId: $testCaseId, result: $result, sheetName: $sheetName}')"
+          resp="$(curl -sS -X POST "$SHEETS_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$payload")"
+          echo "$resp"
+          echo "$resp" | jq -e '.ok == true' >/dev/null || {
+            echo "::error::Google Sheet webhook returned failure (e.g. test_case_not_found if TC-LP-001 is missing from tab Login)."
+            echo "$resp" | jq . 2>/dev/null || echo "$resp"
+            exit 1
+          }
+
+      - name: Report Fail
+        if: needs.test.outputs.playwright-outcome == 'failure'
+        env:
+          SHEETS_WEBHOOK_URL: ${{ secrets.SHEETS_WEBHOOK_URL }}
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: |
+          if [ -z "${SHEETS_WEBHOOK_URL:-}" ] || [ -z "${WEBHOOK_SECRET:-}" ]; then
+            echo "Skipping Google Sheet: set SHEETS_WEBHOOK_URL and WEBHOOK_SECRET in repo Actions secrets."
+            exit 0
+          fi
+          payload="$(jq -n \
+            --arg secret "$WEBHOOK_SECRET" \
+            --arg testCaseId "TC-LP-001" \
+            --arg result "Fail" \
+            --arg sheetName "Login" \
+            '{secret: $secret, testCaseId: $testCaseId, result: $result, sheetName: $sheetName}')"
+          resp="$(curl -sS -X POST "$SHEETS_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$payload")"
+          echo "$resp"
+          echo "$resp" | jq -e '.ok == true' >/dev/null || {
+            echo "::error::Google Sheet webhook returned failure (e.g. test_case_not_found if TC-LP-001 is missing from tab Login)."
+            echo "$resp" | jq . 2>/dev/null || echo "$resp"
+            exit 1
+          }
